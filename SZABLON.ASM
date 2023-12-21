@@ -11,6 +11,7 @@ start:	mov	ax, _data
 	
 	mov cx,5	; Maksymalna liczba iteracji
 	mov dx,0	; Wyczyszczenie DX
+	mov di,0
 	
 INPUT:    
 	mov ah,08h	
@@ -22,11 +23,38 @@ INPUT:
 	int 21h		; Wypisanie znaku w konsoli
 	cmp cx,5	
 	JE SIGN		; Ustawienie znaku liczby
-	PUSH dx
-	LOOP INPUT
-
+	MOV ax,dx
+	STOSB		; umieszczenie bajtu w ES:DI
+	LOOP INPUT	
+INIT:
+	mov bx,0
+	mov cx,1
+	dec di
+	mov si,di
+	mov ax,ES:[SI]	; pobranie pierwszego znaku od konca 
 SUM:
-		
+	mov ah,0
+	SUB	al,48d	; ZAMIANA ASCII NA LICZBE
+	CMP al,10d	; SPRAWDZENIE CZY 0-9 WIEKSZE ZNAKI
+	JGE ERR		; JESLI INNA NIZ DEC PRZEJDZ DO WYSWIELENIA BLEDU 
+	CMP al,0d		; SPRAWDZENIE CZY 0-9 MNIEJSZE ZNAKI SPACJA itd.
+	JL ERR
+	MUL cx		; PRZEMNOZENIE ZALEZNIE OD POZYCJI
+	ADD bx,ax	; SUMOWANIE LICZBY 10
+	mov ax,cx	; MNOZENIE 1 -> 10 -> 100 -> ...
+	mov dx,10d
+	MUL dx
+	mov cx,ax
+	dec si
+	mov ax,ES:[SI]	; POBRANIE KOLEJNEGO ZNAKU
+	cmp al,'-'
+	JE STOP		; Konwersja jesli liczba ujemna 
+	cmp al,'+'
+	JE STOP		; Konwersja jesli liczba dodatnia 
+	nop		; JMP nie chcialo dzialac bez tego
+	JMP SUM
+	
+STOP:
 	mov	ah, 4ch
 	mov	al, 0
 	int	21h
@@ -34,23 +62,34 @@ SUM:
 SIGN:	
 	cmp dl,'-'
 	JE MINUS	; Znak jesli liczba jest ujemna
-	PUSH '+'	; Liczba jest dodatnia
+	MOV AX,'+'	; Liczba jest dodatnia
+	STOSB
+	MOV AX,DX	
+	STOSB		; ZAPISANIE PIERWSZEJ CYFRY PO ZNAKU
 	dec cx		; dekrementacja poniewaz nie bedziemy wypisywac plusa
 	JMP INPUT
 MINUS:
-	PUSH dx
+	MOV AX,'-'
+	STOSB		; ZAPISANIE ZNAKU
+	MOV AX,DX
+	STOSB		 ; ZAPISANIE PIERWSZEJ CYFRY PO ZNAKU
 	JMP INPUT
-ENT:
+ENT:			; OBSLUGA PIERWSZEGO ENTERa
 	cmp cx,4
-	JBE SUM
+	JBE INIT	; PONIZEJ LUB ROWNO, KIEDY KLIKNIETO ENTER
 	mov dl,'B'	; TU ZMIENIC NA WYSWIETLNIE BLEDU
 	mov ah,02h
 	int 21h	
 	mov	ah, 4ch
 	mov	al, 0
 	int	21h
-	
-	
+ERR:			; OBSLUGA NIEPRAWIDLOWYCH DANYCH
+	mov dl,'B'	; TU ZMIENIC NA WYSWIETLNIE BLEDU
+	mov ah,02h
+	int 21h	
+	mov	ah, 4ch
+	mov	al, 0
+	int	21h
 _code ends
 
 _data segment
